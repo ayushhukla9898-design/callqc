@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#6C5CE7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CallQC AI — Recording Category Detector</title>
+<link rel="manifest" href="manifest.webmanifest">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root {
+    --bg:#0f0e17; --card:#1a1929; --card2:#232135; --accent:#6C5CE7; --accent2:#a29bfe;
+    --green:#00b894; --red:#d63031; --orange:#e17055; --yellow:#fdcb6e;
+    --text:#eae8f5; --muted:#8b88a3; --border:#2e2b45;
+  }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans Devanagari',sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:90px; }
+  .header { background:linear-gradient(135deg,#6C5CE7,#4834d4); padding:18px 16px 14px;
+    position:sticky; top:0; z-index:50; box-shadow:0 2px 12px rgba(0,0,0,.4); }
+  .header h1 { font-size:19px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .header .sub { font-size:12px; opacity:.85; margin-top:3px; }
+  .container { padding:14px; max-width:640px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:14px; }
+  .card h2 { font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:7px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:12px 18px; border-radius:12px; border:none; font-size:15px; font-weight:700;
+    cursor:pointer; transition:.15s; width:100%; }
+  .btn:active { transform:scale(.97); }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-green { background:var(--green); color:#fff; }
+  .btn-red { background:var(--red); color:#fff; }
+  .btn-ghost { background:var(--card2); color:var(--text); border:1px solid var(--border); }
+  .btn-sm { padding:8px 12px; font-size:13px; width:auto; border-radius:9px; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  input[type=text],input[type=number],input[type=password],select,textarea {
+    width:100%; padding:12px; border-radius:10px; border:1px solid var(--border);
+    background:var(--card2); color:var(--text); font-size:15px; }
+  input:focus,textarea:focus { outline:2px solid var(--accent); }
+  label { font-size:12.5px; color:var(--muted); display:block; margin:10px 0 5px; font-weight:600; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  .stat { background:var(--card2); border-radius:12px; padding:10px 6px; text-align:center; }
+  .stat .num { font-size:20px; font-weight:800; }
+  .stat .lbl { font-size:10.5px; color:var(--muted); margin-top:2px; }
+  .progress-wrap { background:var(--card2); border-radius:12px; height:26px; overflow:hidden;
+    position:relative; margin:10px 0; }
+  .progress-bar { height:100%; background:linear-gradient(90deg,#6C5CE7,#00b894);
+    transition:width .3s; width:0%; }
+  .progress-txt { position:absolute; inset:0; display:flex; align-items:center;
+    justify-content:center; font-size:12px; font-weight:700; }
+  .pill { display:inline-block; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700; }
+  .pill-done { background:rgba(0,184,148,.18); color:#55efc4; }
+  .pill-run { background:rgba(253,203,110,.18); color:var(--yellow); }
+  .pill-fail { background:rgba(214,48,49,.18); color:#ff7675; }
+  .pill-wait { background:rgba(139,136,163,.15); color:var(--muted); }
+  .log { background:#12111d; border-radius:12px; padding:10px 12px; font-size:12px;
+    font-family:ui-monospace,monospace; max-height:170px; overflow-y:auto; border:1px solid var(--border); }
+  .log div { padding:2.5px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .log .ok { color:#55efc4; } .log .err { color:#ff7675; } .log .inf { color:var(--accent2); }
+  .result-row { display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:10px 12px; background:var(--card2); border-radius:10px; margin-bottom:7px; font-size:13px; }
+  .result-row .rnum { font-weight:800; color:var(--accent2); min-width:44px; }
+  .result-row .rcat { flex:1; }
+  .tabbar { position:fixed; bottom:0; left:0; right:0; background:#161526;
+    border-top:1px solid var(--border); display:flex; z-index:60; }
+  .tab { flex:1; padding:11px 4px 14px; text-align:center; font-size:11px; color:var(--muted);
+    cursor:pointer; border:none; background:none; font-weight:600; }
+  .tab.active { color:var(--accent2); }
+  .tab .ico { font-size:20px; display:block; margin-bottom:2px; }
+  .page { display:none; } .page.active { display:block; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5; }
+  .chip { display:inline-block; background:var(--card2); border:1px solid var(--border);
+    border-radius:8px; padding:5px 10px; font-size:12px; margin:3px 4px 3px 0; }
+  .dropzone { border:2px dashed var(--border); border-radius:14px; padding:26px 14px;
+    text-align:center; color:var(--muted); font-size:14px; cursor:pointer; }
+  .dropzone.over { border-color:var(--accent); color:var(--text); }
+  .catlist { max-height:300px; overflow-y:auto; }
+  .catitem { display:flex; gap:8px; align-items:flex-start; padding:8px 10px;
+    background:var(--card2); border-radius:10px; margin-bottom:6px; font-size:12.5px; }
+  .catitem .prio { font-weight:800; min-width:30px; color:var(--yellow); }
+  .toast { position:fixed; top:70px; left:50%; transform:translateX(-50%);
+    background:var(--card2); border:1px solid var(--accent); padding:10px 18px;
+    border-radius:12px; font-size:13px; font-weight:600; z-index:99; display:none; }
+  .keyok { color:var(--green); font-size:12px; font-weight:700; }
+  .keybad { color:var(--red); font-size:12px; font-weight:700; }
+  .speedset { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .speedset select { width:auto; padding:8px 10px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🎧 CallQC AI</h1>
+  <div class="sub">Recording sunke category — automatic</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="container">
+
+  <!-- ============ PAGE: HOME ============ -->
+  <div class="page active" id="page-home">
+    <div class="card" id="sheetInfoCard" style="display:none">
+      <h2>📄 Loaded Sheet</h2>
+      <div id="sheetInfo"></div>
+    </div>
+    <div class="card">
+      <h2>📤 CSV Sheet Upload Karo</h2>
+      <div class="dropzone" id="dropzone">
+        📁 CSV file yahan tap karke choose karo<br>
+        <span class="hint">recordings column mein m3u8 links honi chahiye</span>
+      </div>
+      <input type="file" id="csvFile" accept=".csv,text/csv" style="display:none">
+    </div>
+    <div class="card" id="rangeCard" style="display:none">
+      <h2>🎯 Row Range (kis row se kis row tak)</h2>
+      <div class="row2">
+        <div><label>Start Row (data row 1 = sheet ki pehli entry)</label>
+          <input type="number" id="startRow" min="1" placeholder="e.g. 1"></div>
+        <div><label>End Row</label>
+          <input type="number" id="endRow" min="1" placeholder="e.g. 200"></div>
+      </div>
+      <div class="hint" id="rangeHint"></div>
+      <div style="margin-top:12px">
+        <button class="btn btn-green" id="startBtn">▶️ Processing Shuru Karo</button>
+      </div>
+      <div class="hint">💡 Daily 700 recordings? Batches mein karo: 1-200, phir 201-400, phir 401-600, phir 601-700. Progress save rehti hai — band karke wapas khologe to wahi se chalega.</div>
+    </div>
+    <div class="card" id="progressCard" style="display:none">
+      <h2>⚙️ Processing</h2>
+      <div class="stats">
+        <div class="stat"><div class="num" id="stTotal" style="color:var(--accent2)">0</div><div class="lbl">Total</div></div>
+        <div class="stat"><div class="num" id="stDone" style="color:#55efc4">0</div><div class="lbl">Ho Gaye ✅</div></div>
+        <div class="stat"><div class="num" id="stFail" style="color:#ff7675">0</div><div class="lbl">Failed ❌</div></div>
+        <div class="stat"><div class="num" id="stLeft" style="color:var(--yellow)">0</div><div class="lbl">Baaki ⏳</div></div>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="pbar"></div>
+        <div class="progress-txt" id="ptxt">0%</div></div>
+      <div id="curItem" style="font-size:12.5px;color:var(--yellow);margin-bottom:8px"></div>
+      <div class="row2">
+        <button class="btn btn-red btn-sm" id="pauseBtn" style="width:100%">⏸️ Pause</button>
+        <button class="btn btn-ghost btn-sm" id="clearLogBtn" style="width:100%">🧹 Log Saaf</button>
+      </div>
+      <div class="log" id="log" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE: RESULTS ============ -->
+  <div class="page" id="page-results">
+    <div class="card">
+      <h2>📊 Results</h2>
+      <div id="resSummary"></div>
+      <div style="display:flex;gap:8px;margin:12px 0">
+        <button class="btn btn-green btn-sm" id="dlFull" style="flex:1">⬇️ Full CSV</button>
+        <button class="btn btn-primary btn-sm" id="dlFailed" style="flex:1">⬇️ Failed List</button>
+      </div>
+      <div class="hint">Full CSV = aapki original sheet + AI Category + Confidence columns. Failed list = jo links expired/dead thi (unhe dobara try kar sakte ho jab fresh links milenge).</div>
+    </div>
+    <div class="card">
+      <h2>🔍 Row-wise Results <span id="resCount"></span></h2>
+      <div class="row2" style="margin-bottom:10px">
+        <input type="text" id="resSearch" placeholder="Search row no / category...">
+        <select id="resFilter">
+          <option value="">Sab</option><option value="done">✅ Done</option>
+          <option value="failed">❌ Failed</option><option value="pending">⏳ Pending</option>
+        </select>
+      </div>
+      <div id="resList"></div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE: SETTINGS ============ -->
+  <div class="page" id="page-settings">
+    <div class="card">
+      <h2>🔑 Gemini API Key</h2>
+      <input type="password" id="apiKey" placeholder="AIza... apni key yahan paste karo">
+      <div id="keyStatus" style="margin-top:6px"></div>
+      <div style="margin-top:10px"><button class="btn btn-primary btn-sm" id="saveKey">💾 Key Save Karo</button>
+      <button class="btn btn-ghost btn-sm" id="testKey">🧪 Test Key</button></div>
+      <div class="hint">Free key ke liye: <b>Google AI Studio</b> (aistudio.google.com/apikey) → Google account se login → "Create API Key" → copy karke yahan paste karo. Ek baar save = hamesha ke liye (phone mein hi store hoti hai).</div>
+    </div>
+    <div class="card">
+      <h2>⚡ Speed Setting</h2>
+      <label>Ek saath kitni recordings process karein</label>
+      <div class="speedset">
+        <select id="concurrency">
+          <option value="1">1 (Slow, safe)</option>
+          <option value="2" selected>2 (Recommended)</option>
+          <option value="3">3 (Fast)</option>
+        </select>
+        <span class="hint">Zyada = fast, par API rate limit ka chance badhta hai</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>📋 Category Chart (AI ka reference)</h2>
+      <div class="hint" style="margin-bottom:8px">Ye chart AI ko diya jata hai. Edit kar sakte ho (1 category per line, format: <b>Naam | rule</b>)</div>
+      <textarea id="catChart" rows="14" style="font-size:12.5px;font-family:ui-monospace,monospace"></textarea>
+      <div style="margin-top:10px"><button class="btn btn-primary btn-sm" id="saveChart">💾 Chart Save Karo</button>
+      <button class="btn btn-ghost btn-sm" id="resetChart">↩️ Default Wapas</button></div>
+    </div>
+    <div class="card">
+      <h2>🗑️ Data Management</h2>
+      <div id="storageInfo" class="hint"></div>
+      <button class="btn btn-red btn-sm" id="wipeBtn" style="margin-top:8px">🗑️ Saara Data Delete Karo</button>
+      <div class="hint">API key aur category chart delete nahi honge — sirf sheets aur results.</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="tabbar">
+  <button class="tab active" data-page="page-home"><span class="ico">🏠</span>Home</button>
+  <button class="tab" data-page="page-results"><span class="ico">📊</span>Results</button>
+  <button class="tab" data-page="page-settings"><span class="ico">⚙️</span>Settings</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
